@@ -46,30 +46,46 @@ RULES:
 RAW SLIDES TEXT:
 ${rawText}`;
 
-    // Step 3: Call Gemini (use 1.5-flash to avoid sharing quota with chat's 2.0-flash)
-    const geminiResp = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            maxOutputTokens: 8192,
-            temperature: 0.1,
-            responseMimeType: "application/json",
-          },
-        }),
-      }
-    );
+    // Step 3: Call Gemini — try multiple models in case one is rate-limited
+    const models = ["gemini-2.0-flash", "gemini-2.0-flash-lite"];
+    let geminiText = null;
+    let lastError = null;
 
-    const geminiData = await geminiResp.json();
-    if (geminiData.error) throw new Error(`Gemini API error: ${JSON.stringify(geminiData.error)}`);
-    const geminiText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!geminiText) {
-      const reason = geminiData.candidates?.[0]?.finishReason || "unknown";
-      throw new Error(`Empty Gemini response (finishReason: ${reason}, raw: ${JSON.stringify(geminiData).slice(0, 500)})`);
+    for (const model of models) {
+      try {
+        const geminiResp = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: {
+                maxOutputTokens: 8192,
+                temperature: 0.1,
+                responseMimeType: "application/json",
+              },
+            }),
+          }
+        );
+
+        const geminiData = await geminiResp.json();
+        if (geminiData.error) {
+          lastError = `${model}: ${geminiData.error.message || JSON.stringify(geminiData.error)}`;
+          continue; // try next model
+        }
+
+        geminiText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (geminiText) break; // success
+
+        const reason = geminiData.candidates?.[0]?.finishReason || "unknown";
+        lastError = `${model}: empty response (finishReason: ${reason})`;
+      } catch (e) {
+        lastError = `${model}: ${e.message}`;
+      }
     }
+
+    if (!geminiText) throw new Error(`All models failed. Last error: ${lastError}`);
 
     // Step 4: Parse and validate
     let parsed;
