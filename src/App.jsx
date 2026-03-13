@@ -2727,7 +2727,7 @@ const LessonDetail = ({ lessonId, lesson, progress, onPickMode }) => (
 );
 
 // ── SYNC HELPER ───────────────────────────────────────────────────────────────
-const LESSONS_VERSION = 2; // bump to invalidate cached lessons
+const LESSONS_VERSION = 3; // bump to invalidate cached lessons
 const useSyncLessons = () => {
   const [lessons, setLessons] = useState(() => {
     const cached = localStorage.getItem("synced_lessons");
