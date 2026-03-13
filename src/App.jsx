@@ -1183,10 +1183,11 @@ const useSyncToServer = (userId) => {
       try {
         const progress = JSON.parse(localStorage.getItem("study_progress") || "{}");
         const timeData = JSON.parse(localStorage.getItem("study_time") || "{}");
+        const onboardingDone = localStorage.getItem("onboarding_done") === "1";
         fetch("/api/sync", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "save", userId, progress, timeData }),
+          body: JSON.stringify({ action: "save", userId, progress, timeData, onboardingDone }),
         }).catch(() => {});
       } catch {}
     };
@@ -1770,6 +1771,8 @@ const Speaking = ({ lesson }) => {
 };
 
 // ── STORIES (pre-written choose-your-own-adventure, no API needed) ────────────
+const stripHints = (text) => text.replace(/\s*\([A-Za-z][^)]*\)/g, "").replace(/\s*[—–]\s*[A-Za-z].*$/g, "").trim();
+
 const Stories = ({ lessonId, recordStoryComplete, getStoryStatus }) => {
   const [active, setActive] = useState(null);
   const [stepIdx, setStepIdx] = useState(0);
@@ -1846,7 +1849,7 @@ const Stories = ({ lessonId, recordStoryComplete, getStoryStatus }) => {
             <div className={`max-w-[85%] rounded-2xl px-4 py-2 text-sm leading-relaxed ${
               m.role === "user" ? "bg-purple-600 text-white rounded-br-sm" : "bg-white border border-gray-200 text-gray-800 rounded-bl-sm"
             }`}>
-              {m.text}
+              {stripHints(m.text)}
               {m.role === "npc" && (
                 <button onClick={() => { const jp = m.text.match(/[ぁ-んァ-ヶー一-龯]+[^()\n]*/); if (jp) speak(jp[0]); }}
                   className="ml-2 text-xs opacity-50 hover:opacity-100">🔊</button>
@@ -1877,7 +1880,7 @@ const Stories = ({ lessonId, recordStoryComplete, getStoryStatus }) => {
           {currentStep.choices.map((c, i) => (
             <button key={i} onClick={() => choose(c)}
               className="w-full text-left px-3 py-2 rounded-xl border border-gray-200 text-sm hover:border-purple-400 hover:bg-purple-50 transition-all">
-              {c.text}
+              {stripHints(c.text)}
             </button>
           ))}
         </div>
@@ -2989,6 +2992,7 @@ export default function App() {
       const data = await resp.json();
       if (data.progress) localStorage.setItem("study_progress", JSON.stringify(data.progress));
       if (data.timeData) localStorage.setItem("study_time", JSON.stringify(data.timeData));
+      if (data.onboardingDone) localStorage.setItem("onboarding_done", "1");
     } catch {}
   };
 
@@ -2997,8 +3001,9 @@ export default function App() {
       try {
         const progress = JSON.parse(localStorage.getItem("study_progress") || "{}");
         const timeData = JSON.parse(localStorage.getItem("study_time") || "{}");
+        const onboardingDone = localStorage.getItem("onboarding_done") === "1";
         await fetch("/api/sync", { method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "save", userId: currentUser.id, progress, timeData }),
+          body: JSON.stringify({ action: "save", userId: currentUser.id, progress, timeData, onboardingDone }),
         });
       } catch {}
     }

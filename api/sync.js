@@ -4,7 +4,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "Database not configured" });
   }
 
-  const { action, userId, progress, timeData } = req.body;
+  const { action, userId, progress, timeData, onboardingDone } = req.body;
   if (!userId) return res.status(400).json({ error: "userId required" });
 
   const headers = {
@@ -21,7 +21,8 @@ export default async function handler(req, res) {
       );
       const data = await resp.json();
       if (!Array.isArray(data) || !data.length) return res.status(404).json({ error: "Profile not found" });
-      return res.json({ progress: data[0].progress, timeData: data[0].time_data });
+      const prog = data[0].progress || {};
+      return res.json({ progress: prog, timeData: data[0].time_data, onboardingDone: !!prog.onboarding_done });
     }
 
     if (action === "save") {
@@ -31,7 +32,7 @@ export default async function handler(req, res) {
           method: "PATCH",
           headers: { ...headers, Prefer: "return=minimal" },
           body: JSON.stringify({
-            progress: progress || {},
+            progress: { ...(progress || {}), onboarding_done: !!onboardingDone },
             time_data: timeData || {},
             updated_at: new Date().toISOString(),
           }),
