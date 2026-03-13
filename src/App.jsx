@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { supabase } from "./supabaseClient";
 
 // ── DEFAULT LESSONS (fallback if sync fails) ──────────────────────────────────
 const DEFAULT_LESSONS = {
@@ -1020,63 +1021,23 @@ const useSyncToServer = (userId) => {
 
 // ── PROFILE SCREEN ───────────────────────────────────────────────────────────
 const ProfileScreen = ({ onLogin }) => {
-  const [profiles, setProfiles] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [dbAvailable, setDbAvailable] = useState(true);
-  const [view, setView] = useState("list");
-  const [selected, setSelected] = useState(null);
-  const [username, setUsername] = useState("");
-  const [pin, setPin] = useState("");
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "list" }) })
-      .then((r) => r.json())
-      .then((d) => { if (d.error) setDbAvailable(false); else setProfiles(d.profiles || []); setLoading(false); })
-      .catch(() => { setDbAvailable(false); setLoading(false); });
-  }, []);
-
-  const handleLogin = async () => {
-    if (!pin || pin.length < 4) { setError("Enter your 4+ digit PIN"); return; }
-    setSubmitting(true); setError("");
-    try {
-      const resp = await fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "login", username: selected, pin }) });
-      const data = await resp.json();
-      if (data.error) { setError(data.error); setSubmitting(false); return; }
-      localStorage.setItem("study_progress", JSON.stringify(data.progress || { version: 1, lessons: {}, jlpt: {} }));
-      localStorage.setItem("study_time", JSON.stringify(data.timeData || { sessions: [], totalMinutes: 0 }));
-      localStorage.setItem("current_user", JSON.stringify({ id: data.userId, username: data.username }));
-      onLogin({ id: data.userId, username: data.username });
-    } catch { setError("Connection failed"); setSubmitting(false); }
-  };
-
-  const handleRegister = async () => {
-    if (!username.trim()) { setError("Enter your name"); return; }
-    if (!pin || pin.length < 4) { setError("Choose a 4+ digit PIN"); return; }
-    setSubmitting(true); setError("");
-    try {
-      const resp = await fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "register", username: username.trim(), pin }) });
-      const data = await resp.json();
-      if (data.error) { setError(data.error); setSubmitting(false); return; }
-      localStorage.setItem("study_progress", JSON.stringify({ version: 1, lessons: {}, jlpt: {} }));
-      localStorage.setItem("study_time", JSON.stringify({ sessions: [], totalMinutes: 0 }));
-      localStorage.setItem("current_user", JSON.stringify({ id: data.userId, username: data.username }));
-      onLogin({ id: data.userId, username: data.username });
-    } catch { setError("Connection failed"); setSubmitting(false); }
+  const handleGoogleLogin = async () => {
+    setLoading(true);
+    setError("");
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: window.location.origin },
+    });
+    if (error) { setError(error.message); setLoading(false); }
   };
 
   const skipLogin = () => {
     localStorage.setItem("current_user", JSON.stringify({ id: "local", username: "Guest" }));
     onLogin({ id: "local", username: "Guest" });
   };
-
-  if (loading) return (
-    <div className="flex flex-col h-screen bg-gray-50 items-center justify-center font-sans max-w-lg mx-auto">
-      <div className="text-4xl animate-bounce">🇯🇵</div>
-      <div className="text-gray-400 text-sm mt-2">Loading...</div>
-    </div>
-  );
 
   return (
     <div className="flex flex-col h-screen bg-gray-50 font-sans max-w-lg mx-auto">
@@ -1085,79 +1046,25 @@ const ProfileScreen = ({ onLogin }) => {
         <div className="text-xs text-red-200">Japanese Study App</div>
       </div>
       <div className="flex-1 overflow-y-auto p-4">
-        {view === "list" && (
-          <div className="space-y-4">
-            <div className="text-center py-4">
-              <div className="text-5xl mb-2">🇯🇵</div>
-              <div className="text-lg font-bold text-gray-800">Who's studying today?</div>
-              <div className="text-xs text-gray-400 mt-1">Pick your profile or create one</div>
-            </div>
-            {profiles.map((p) => (
-              <button key={p.id} onClick={() => { setSelected(p.username); setView("login"); setPin(""); setError(""); }}
-                className="w-full bg-white rounded-2xl border border-gray-100 p-4 flex items-center gap-3 hover:border-red-300 hover:bg-red-50 transition-all shadow-sm text-left">
-                <div className="w-10 h-10 bg-red-100 text-red-600 rounded-full flex items-center justify-center text-lg font-bold">{p.username[0]?.toUpperCase()}</div>
-                <div className="flex-1">
-                  <div className="font-semibold text-gray-800">{p.username}</div>
-                  <div className="text-xs text-gray-400">Tap to sign in</div>
-                </div>
-                <div className="text-gray-300 text-lg">→</div>
-              </button>
-            ))}
-            <button onClick={() => { setView("register"); setUsername(""); setPin(""); setError(""); }}
-              className="w-full bg-red-600 text-white rounded-2xl p-4 font-semibold hover:bg-red-700 transition-all shadow-lg text-center">
-              + Create New Profile
-            </button>
-            {!dbAvailable && (
-              <div className="text-xs text-amber-600 bg-amber-50 rounded-lg p-3 text-center">Database not connected — profiles won't sync across devices</div>
-            )}
-            <button onClick={skipLogin} className="w-full text-center text-xs text-gray-400 hover:text-gray-600 py-2">Continue as Guest (no cloud sync)</button>
+        <div className="space-y-4">
+          <div className="text-center py-8">
+            <div className="text-5xl mb-3">🇯🇵</div>
+            <div className="text-lg font-bold text-gray-800">Welcome!</div>
+            <div className="text-sm text-gray-500 mt-1">Sign in to sync your progress across devices</div>
           </div>
-        )}
-
-        {view === "login" && (
-          <div className="space-y-4">
-            <button onClick={() => setView("list")} className="text-sm text-gray-400 hover:text-gray-600">← Back</button>
-            <div className="text-center py-4">
-              <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-3">{selected?.[0]?.toUpperCase()}</div>
-              <div className="text-lg font-bold text-gray-800">{selected}</div>
-              <div className="text-xs text-gray-400 mt-1">Enter your PIN to continue</div>
-            </div>
-            <input type="number" inputMode="numeric" pattern="[0-9]*" placeholder="Enter PIN" value={pin} onChange={(e) => setPin(e.target.value)}
-              className="w-full bg-white border border-gray-200 rounded-xl p-3 text-center text-lg tracking-widest focus:outline-none focus:border-red-400" autoFocus />
-            {error && <div className="text-red-500 text-sm text-center">{error}</div>}
-            <button onClick={handleLogin} disabled={submitting}
-              className="w-full bg-red-600 text-white rounded-xl p-3 font-semibold hover:bg-red-700 disabled:opacity-50 transition-all">
-              {submitting ? "Signing in..." : "Sign In →"}
-            </button>
-          </div>
-        )}
-
-        {view === "register" && (
-          <div className="space-y-4">
-            <button onClick={() => setView("list")} className="text-sm text-gray-400 hover:text-gray-600">← Back</button>
-            <div className="text-center py-2">
-              <div className="text-3xl mb-2">✨</div>
-              <div className="text-lg font-bold text-gray-800">Create Your Profile</div>
-              <div className="text-xs text-gray-400 mt-1">Your stats will be saved separately</div>
-            </div>
-            <div>
-              <label className="text-xs font-medium text-gray-500 mb-1 block">Your Name</label>
-              <input type="text" placeholder="e.g. Nicholas" value={username} onChange={(e) => setUsername(e.target.value)}
-                className="w-full bg-white border border-gray-200 rounded-xl p-3 focus:outline-none focus:border-red-400" autoFocus />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-gray-500 mb-1 block">Choose a PIN</label>
-              <input type="number" inputMode="numeric" pattern="[0-9]*" placeholder="4+ digits" value={pin} onChange={(e) => setPin(e.target.value)}
-                className="w-full bg-white border border-gray-200 rounded-xl p-3 text-center text-lg tracking-widest focus:outline-none focus:border-red-400" />
-              <div className="text-[10px] text-gray-400 mt-1">So nobody edits your stats by accident</div>
-            </div>
-            {error && <div className="text-red-500 text-sm text-center">{error}</div>}
-            <button onClick={handleRegister} disabled={submitting}
-              className="w-full bg-red-600 text-white rounded-xl p-3 font-semibold hover:bg-red-700 disabled:opacity-50 transition-all">
-              {submitting ? "Creating..." : "Create & Start Studying →"}
-            </button>
-          </div>
-        )}
+          <button onClick={handleGoogleLogin} disabled={loading}
+            className="w-full bg-white border border-gray-200 rounded-2xl p-4 flex items-center justify-center gap-3 hover:border-red-300 hover:bg-red-50 transition-all shadow-sm disabled:opacity-50">
+            <svg className="w-5 h-5" viewBox="0 0 24 24">
+              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
+              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+            </svg>
+            <span className="font-semibold text-gray-700">{loading ? "Redirecting..." : "Sign in with Google"}</span>
+          </button>
+          {error && <div className="text-red-500 text-sm text-center">{error}</div>}
+          <button onClick={skipLogin} className="w-full text-center text-xs text-gray-400 hover:text-gray-600 py-2">Continue as Guest (no cloud sync)</button>
+        </div>
       </div>
     </div>
   );
@@ -2233,20 +2140,81 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(() => {
     try { return JSON.parse(localStorage.getItem("current_user")); } catch { return null; }
   });
+  const [authLoading, setAuthLoading] = useState(true);
 
-  const handleLogout = () => {
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        const user = session.user;
+        const userObj = {
+          id: user.id,
+          username: user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split("@")[0] || "User",
+          email: user.email,
+          avatarUrl: user.user_metadata?.avatar_url,
+        };
+        localStorage.setItem("current_user", JSON.stringify(userObj));
+        setCurrentUser(userObj);
+        loadProgressFromServer(user.id);
+      }
+      setAuthLoading(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_IN" && session) {
+        const user = session.user;
+        const userObj = {
+          id: user.id,
+          username: user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split("@")[0] || "User",
+          email: user.email,
+          avatarUrl: user.user_metadata?.avatar_url,
+        };
+        localStorage.setItem("current_user", JSON.stringify(userObj));
+        setCurrentUser(userObj);
+        loadProgressFromServer(user.id);
+      }
+      if (event === "SIGNED_OUT") {
+        localStorage.removeItem("current_user");
+        setCurrentUser(null);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const loadProgressFromServer = async (userId) => {
+    try {
+      const resp = await fetch("/api/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "load", userId }),
+      });
+      const data = await resp.json();
+      if (data.progress) localStorage.setItem("study_progress", JSON.stringify(data.progress));
+      if (data.timeData) localStorage.setItem("study_time", JSON.stringify(data.timeData));
+    } catch {}
+  };
+
+  const handleLogout = async () => {
     if (currentUser?.id && currentUser.id !== "local") {
       try {
         const progress = JSON.parse(localStorage.getItem("study_progress") || "{}");
         const timeData = JSON.parse(localStorage.getItem("study_time") || "{}");
-        fetch("/api/sync", { method: "POST", headers: { "Content-Type": "application/json" },
+        await fetch("/api/sync", { method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ action: "save", userId: currentUser.id, progress, timeData }),
-        }).catch(() => {});
+        });
       } catch {}
     }
+    await supabase.auth.signOut();
     localStorage.removeItem("current_user");
     setCurrentUser(null);
   };
+
+  if (authLoading) return (
+    <div className="flex flex-col h-screen bg-gray-50 items-center justify-center font-sans max-w-lg mx-auto">
+      <div className="text-4xl animate-bounce">🇯🇵</div>
+      <div className="text-gray-400 text-sm mt-2">Loading...</div>
+    </div>
+  );
 
   if (!currentUser) return <ProfileScreen onLogin={setCurrentUser} />;
   return <AppMain key={currentUser.id} currentUser={currentUser} onLogout={handleLogout} />;
