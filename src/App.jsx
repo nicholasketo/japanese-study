@@ -1271,7 +1271,7 @@ const Listening = ({ lesson, lessonId, recordListeningScore }) => {
     if (!input.trim()) return;
     const item = pool[idx];
     const ni = normalize(input);
-    const correct = normalize(item.roma) === ni || normalize(item.jp) === ni;
+    const correct = normalize(item.en) === ni;
     setIsCorrect(correct);
     if (correct) setScore((s) => s + 1);
     setSubmitted(true);
@@ -1293,7 +1293,7 @@ const Listening = ({ lesson, lessonId, recordListeningScore }) => {
       <div className="text-center py-6">
         <div className="text-4xl mb-2">👂</div>
         <div className="font-bold text-lg text-gray-800">Listening Practice</div>
-        <div className="text-sm text-gray-500 mt-1">Listen and type what you hear</div>
+        <div className="text-sm text-gray-500 mt-1">Listen and type the English meaning</div>
       </div>
       {[
         { id: "vocab", label: "Vocabulary", desc: "Single words", icon: "📝", count: lesson.vocab.length },
@@ -1350,7 +1350,7 @@ const Listening = ({ lesson, lessonId, recordListeningScore }) => {
       {!submitted ? (
         <div className="flex gap-2">
           <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && checkAnswer()}
-            placeholder="Type what you heard (romaji or かな)..." autoFocus
+            placeholder="Type the English meaning..." autoFocus
             className="flex-1 px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-sky-400" />
           <button onClick={checkAnswer} disabled={!input.trim()} className="px-5 py-3 bg-sky-600 text-white rounded-xl font-medium hover:bg-sky-700 disabled:opacity-40">Check</button>
         </div>
