@@ -46,9 +46,9 @@ RULES:
 RAW SLIDES TEXT:
 ${rawText}`;
 
-    // Step 3: Call Gemini (use lite model to avoid sharing quota with chat)
+    // Step 3: Call Gemini (use 1.5-flash to avoid sharing quota with chat's 2.0-flash)
     const geminiResp = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
