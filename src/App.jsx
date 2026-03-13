@@ -1080,7 +1080,7 @@ const MODE_TILES = [
     statFn: () => "Record & compare" },
   { id: "stories", name: "Stories", icon: "📖", color: "from-purple-500 to-violet-600", desc: "Choose-your-own-adventure",
     statFn: (p, l) => { let c = 0, t = 0; Object.keys(l).forEach((id) => { t += (SCENARIOS[id] || []).length; c += p.lessons?.[id]?.stories?.completed?.length || 0; }); return `${c}/${t} scenarios done`; } },
-  { id: "chat", name: "AI Tutor", icon: "🤖", color: "from-emerald-500 to-teal-600", desc: "Chat with your tutor",
+  { id: "chat", name: "Sensei", icon: "🧑‍🏫", color: "from-emerald-500 to-teal-600", desc: "Your personal Japanese tutor",
     statFn: () => "Powered by Gemini" },
 ];
 
@@ -1089,7 +1089,7 @@ const MODE_META = {
   quiz: { name: "Quiz", icon: "❓", color: "text-orange-600", bg: "bg-orange-50" },
   speak: { name: "Speaking", icon: "🎤", color: "text-blue-600", bg: "bg-blue-50" },
   stories: { name: "Stories", icon: "📖", color: "text-purple-600", bg: "bg-purple-50" },
-  chat: { name: "AI Tutor", icon: "🤖", color: "text-teal-600", bg: "bg-teal-50" },
+  chat: { name: "Sensei", icon: "🧑‍🏫", color: "text-teal-600", bg: "bg-teal-50" },
 };
 
 // ── FLASHCARDS ────────────────────────────────────────────────────────────────
@@ -1498,7 +1498,7 @@ const Stories = ({ lessonId, recordStoryComplete, getStoryStatus }) => {
 // ── CHAT TUTOR ────────────────────────────────────────────────────────────────
 const ChatTutor = ({ lesson, lessonId, username = "Guest" }) => {
   const [messages, setMessages] = useState([
-    { role: "assistant", text: `Hey ${username}! Let's practice Japanese! I'll give you words and phrases to say — tap the mic and try! Ready?` },
+    { role: "assistant", text: `Hey ${username}! 👋 What do you want to practice?\n\n• Type "drill me" — I'll quiz you on vocab & grammar\n• Type any English phrase — I'll teach you how to say it\n• Tap 🎤 and try speaking Japanese — I'll check it\n• Or just ask me anything about this lesson!` },
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -1520,7 +1520,7 @@ const ChatTutor = ({ lesson, lessonId, username = "Guest" }) => {
     setLoading(true);
     try {
       const history = messages.slice(-10).map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.text }));
-      const system = `You are a friendly Japanese language tutor for ${username}, a complete beginner.
+      const system = `You are a friendly Japanese language tutor named Sensei for ${username}, a complete beginner.
 
 He is studying Lesson ${lessonId}: "${lesson.title}".
 
@@ -1530,21 +1530,21 @@ Vocabulary: ${lesson.vocab.map((v) => `${v.jp} (${v.roma}) = ${v.en}`).join(", "
 
 Grammar: ${lesson.grammar.map((g) => `${g.jp} (${g.roma}) = ${g.en}`).join(", ")}
 
-YOU ARE A DRILL INSTRUCTOR. Your job is to actively teach him by:
-1. Giving him a phrase in English and asking him to say it in Japanese
-2. Example: "How do you say 'student' in Japanese? Try saying it!"
-3. When he responds, praise him if correct, gently correct if wrong, then give the next challenge
-4. Walk him through the lesson vocabulary one by one, then combine words using the grammar patterns
-5. Make it conversational and fun — like a real tutor sitting across from him
+RESPOND BASED ON WHAT THE USER ASKS:
+- If they say "drill me" or want to practice: Quiz them one word/phrase at a time. Give English, ask for Japanese. Praise if correct, gently correct if wrong, then give the next one.
+- If they type an English phrase: Teach them how to say it in Japanese using the lesson vocab/grammar. Break it down step by step.
+- If they speak/type Japanese: Check if it's correct, explain any mistakes, and encourage them.
+- If they ask a question: Answer it simply and clearly, using examples from the lesson.
 
 FORMAT RULES:
 - NEVER use Japanese words outside his vocabulary list. Use English for anything else.
-- ALWAYS show romaji: にほん (nihon)
-- Keep responses to 1-3 short sentences
-- Always end with the next challenge: "Now try saying ___!" or "How would you say ___?"
-- Start simple (single words) then build up to grammar patterns as he gets them right
-- When a phrase has a placeholder like "name" or "___", use real examples. The student's name is ${username}. Example: instead of "say your name", say "say ${username}"
-- Make exercises personal and concrete — "How do you say 'I am ${username}' in Japanese?" not "How do you say 'I am [name]'?"`;
+- ALWAYS show romaji next to Japanese: にほん (nihon)
+- Keep responses to 1-3 short sentences. Be concise.
+- End with a follow-up question or prompt to keep the conversation going
+- When drilling, start simple (single words) then build up to grammar patterns
+- When a phrase has a placeholder like "name", use real examples. The student's name is ${username}.
+- Make exercises personal — "How do you say 'I am ${username}' in Japanese?" not "How do you say 'I am [name]'?"
+- Don't lecture. Be interactive. Wait for them to respond before moving on.`;
       const text = await callAnthropic(system, [...history, { role: "user", content: userMsg }]);
       setMessages((p) => [...p, { role: "assistant", text }]);
       if (autoSpeak) {
@@ -1610,7 +1610,7 @@ FORMAT RULES:
             <div className={`max-w-xs rounded-2xl px-4 py-2 text-sm leading-relaxed ${
               m.role === "user" ? "bg-red-600 text-white rounded-br-sm" : "bg-white border border-gray-200 text-gray-800 rounded-bl-sm"
             }`}>
-              {m.text}
+              <span className="whitespace-pre-line">{m.text}</span>
               {m.role === "assistant" && <button onClick={() => speak(m.text.match(/[ぁ-んァ-ン一-龯]+[^\n]*/)?.[0] || m.text)} className="ml-2 text-xs opacity-50 hover:opacity-100">🔊</button>}
             </div>
           </div>
