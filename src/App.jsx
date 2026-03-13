@@ -775,6 +775,16 @@ const JLPT_N5 = {
   ],
 };
 
+// ── CONVERSATION SCENARIOS (AI-powered) ──────────────────────────────────────
+const CONVERSATION_SCENARIOS = [
+  { id: "meeting", title: "Meeting Someone New", emoji: "🤝", desc: "Introduce yourself to a new colleague", setting: "You arrive at your new workplace in Japan and meet a colleague in the hallway.", goal: "Introduce yourself and exchange basic information", character: "A Japanese colleague named Tanaka at your workplace", minLesson: 1 },
+  { id: "restaurant", title: "Restaurant Order", emoji: "🍜", desc: "Order food at a Japanese restaurant", setting: "You sit down at a small ramen restaurant in Tokyo. The waiter approaches your table.", goal: "Successfully order a bowl of ramen and a drink", character: "A waiter at a ramen restaurant", minLesson: 1 },
+  { id: "directions", title: "Asking Directions", emoji: "🗺️", desc: "Find your way to the train station", setting: "You are lost in a Japanese neighborhood and need to find the nearest train station.", goal: "Get directions to the train station", character: "A friendly local walking down the street", minLesson: 3 },
+  { id: "train-ticket", title: "Buying a Ticket", emoji: "🚃", desc: "Buy a train ticket at the station", setting: "You are at a train station ticket counter in Japan.", goal: "Buy a ticket to your destination", character: "A ticket counter attendant at the train station", minLesson: 4 },
+  { id: "shopping", title: "Convenience Store", emoji: "🏪", desc: "Buy something at a konbini", setting: "You walk into a convenience store (konbini) in Japan to buy a snack and a drink.", goal: "Successfully buy items and pay", character: "A convenience store clerk", minLesson: 2 },
+  { id: "cafe", title: "Coffee Shop", emoji: "☕", desc: "Order at a Japanese cafe", setting: "You walk into a cozy coffee shop in Osaka.", goal: "Order a drink and find a seat", character: "A friendly barista at the coffee shop", minLesson: 2 },
+];
+
 // ── UTILITIES ─────────────────────────────────────────────────────────────────
 const speak = (text, lang = "ja-JP") => {
   if (!window.speechSynthesis) return;
@@ -902,12 +912,28 @@ const useProgress = () => {
     return count > 0 ? Math.round(total / count) : 0;
   };
 
+  const recordListeningScore = (lessonId, score, total) => {
+    setProgress((p) => {
+      const l = p.lessons[lessonId] || { flash: { known: [] }, quiz: {}, stories: {}, listening: {} };
+      const best = Math.max(l.listening?.bestScore || 0, score);
+      return { ...p, lessons: { ...p.lessons, [lessonId]: { ...l, listening: { bestScore: best, total, attempts: (l.listening?.attempts || 0) + 1 } } } };
+    });
+  };
+
+  const recordConversationComplete = (scenarioId) => {
+    setProgress((p) => {
+      const convos = p.conversations || {};
+      const existing = convos[scenarioId] || { completed: false, attempts: 0 };
+      return { ...p, conversations: { ...convos, [scenarioId]: { completed: true, attempts: existing.attempts + 1 } } };
+    });
+  };
+
   const resetProgress = () => {
-    setProgress({ version: 1, lessons: {}, jlpt: {} });
+    setProgress({ version: 1, lessons: {}, jlpt: {}, conversations: {} });
     localStorage.removeItem("study_progress");
   };
 
-  return { progress, markFlashKnown, getFlashKnown, recordQuizScore, recordStoryComplete, getStoryStatus, recordJlptScore, getLessonPercent, getJlptPercent, resetProgress };
+  return { progress, markFlashKnown, getFlashKnown, recordQuizScore, recordListeningScore, recordStoryComplete, getStoryStatus, recordJlptScore, recordConversationComplete, getLessonPercent, getJlptPercent, resetProgress };
 };
 
 // ── TIME TRACKER HOOK ────────────────────────────────────────────────────────
@@ -1080,8 +1106,12 @@ const MODE_TILES = [
     statFn: () => "Record & compare" },
   { id: "stories", name: "Stories", icon: "📖", color: "from-purple-500 to-violet-600", desc: "Choose-your-own-adventure",
     statFn: (p, l) => { let c = 0, t = 0; Object.keys(l).forEach((id) => { t += (SCENARIOS[id] || []).length; c += p.lessons?.[id]?.stories?.completed?.length || 0; }); return `${c}/${t} scenarios done`; } },
+  { id: "listen", name: "Listening", icon: "👂", color: "from-cyan-500 to-sky-600", desc: "Hear & type what you hear",
+    statFn: (p, l) => { const a = Object.keys(l).filter((id) => p.lessons?.[id]?.listening?.bestScore != null).length; return `${a}/${Object.keys(l).length} lessons attempted`; } },
   { id: "chat", name: "Sensei", icon: "🧑‍🏫", color: "from-emerald-500 to-teal-600", desc: "Your personal Japanese tutor",
     statFn: () => "Powered by Gemini" },
+  { id: "convo", name: "Conversations", icon: "💬", color: "from-green-500 to-emerald-600", desc: "Real-life AI roleplay",
+    statFn: (p) => { const c = Object.keys(p.conversations || {}).filter((id) => p.conversations[id]?.completed).length; return `${c}/${CONVERSATION_SCENARIOS.length} completed`; } },
 ];
 
 const MODE_META = {
@@ -1089,7 +1119,9 @@ const MODE_META = {
   quiz: { name: "Quiz", icon: "❓", color: "text-orange-600", bg: "bg-orange-50" },
   speak: { name: "Speaking", icon: "🎤", color: "text-blue-600", bg: "bg-blue-50" },
   stories: { name: "Stories", icon: "📖", color: "text-purple-600", bg: "bg-purple-50" },
+  listen: { name: "Listening", icon: "👂", color: "text-sky-600", bg: "bg-sky-50" },
   chat: { name: "Sensei", icon: "🧑‍🏫", color: "text-teal-600", bg: "bg-teal-50" },
+  convo: { name: "Conversations", icon: "💬", color: "text-green-600", bg: "bg-green-50" },
 };
 
 // ── FLASHCARDS ────────────────────────────────────────────────────────────────
@@ -1199,6 +1231,134 @@ const Quiz = ({ lesson, lessonId, recordQuizScore }) => {
         })}
       </div>
       {chosen && <button onClick={next} className="py-2 bg-red-600 text-white rounded-xl font-medium hover:bg-red-700">Next →</button>}
+    </div>
+  );
+};
+
+// ── LISTENING COMPREHENSION ──────────────────────────────────────────────────
+const Listening = ({ lesson, lessonId, recordListeningScore }) => {
+  const [difficulty, setDifficulty] = useState(null);
+  const [pool, setPool] = useState([]);
+  const [idx, setIdx] = useState(0);
+  const [input, setInput] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+  const [isCorrect, setIsCorrect] = useState(false);
+  const [score, setScore] = useState(0);
+  const [finished, setFinished] = useState(false);
+
+  const normalize = (s) => s.replace(/[\s\u3000、。！？・〜ー\-\.,:;'"!?(){}\[\]]/g, "").toLowerCase().trim();
+
+  const startSession = (diff) => {
+    let items = diff === "vocab" ? [...lesson.vocab] : diff === "phrases" ? [...lesson.grammar] : [...lesson.vocab, ...lesson.grammar];
+    for (let i = items.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [items[i], items[j]] = [items[j], items[i]]; }
+    setPool(items.slice(0, Math.min(10, items.length)));
+    setDifficulty(diff);
+    setIdx(0); setScore(0); setInput(""); setSubmitted(false); setFinished(false);
+  };
+
+  const playAudio = (text, rate) => {
+    if (!window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const utt = new SpeechSynthesisUtterance(text);
+    utt.lang = "ja-JP";
+    utt.rate = rate || (difficulty === "speed" ? 1.3 : 0.8);
+    window.speechSynthesis.speak(utt);
+  };
+
+  useEffect(() => { if (pool.length > 0 && !finished && !submitted) playAudio(pool[idx]?.jp); }, [idx, pool]);
+
+  const checkAnswer = () => {
+    if (!input.trim()) return;
+    const item = pool[idx];
+    const ni = normalize(input);
+    const correct = normalize(item.roma) === ni || normalize(item.jp) === ni;
+    setIsCorrect(correct);
+    if (correct) setScore((s) => s + 1);
+    setSubmitted(true);
+  };
+
+  const next = () => {
+    if (idx + 1 >= pool.length) {
+      const finalScore = score + (isCorrect ? 0 : 0); // score already updated
+      setFinished(true);
+      if (recordListeningScore) recordListeningScore(lessonId, score, pool.length);
+    } else {
+      setIdx((i) => i + 1);
+      setInput(""); setSubmitted(false); setIsCorrect(false);
+    }
+  };
+
+  if (!difficulty) return (
+    <div className="p-4 space-y-3">
+      <div className="text-center py-6">
+        <div className="text-4xl mb-2">👂</div>
+        <div className="font-bold text-lg text-gray-800">Listening Practice</div>
+        <div className="text-sm text-gray-500 mt-1">Listen and type what you hear</div>
+      </div>
+      {[
+        { id: "vocab", label: "Vocabulary", desc: "Single words", icon: "📝", count: lesson.vocab.length },
+        { id: "phrases", label: "Grammar Phrases", desc: "Full sentences", icon: "💬", count: lesson.grammar.length },
+        { id: "speed", label: "Speed Round", desc: "All items, faster audio", icon: "⚡", count: lesson.vocab.length + lesson.grammar.length },
+      ].map((d) => (
+        <button key={d.id} onClick={() => startSession(d.id)} className="w-full bg-white rounded-2xl p-4 flex items-center gap-3 shadow-sm hover:shadow-md transition-all border border-gray-100">
+          <div className="text-2xl">{d.icon}</div>
+          <div className="flex-1 text-left">
+            <div className="font-semibold text-gray-800">{d.label}</div>
+            <div className="text-xs text-gray-500">{d.desc} · {d.count} items</div>
+          </div>
+          <span className="text-gray-400">→</span>
+        </button>
+      ))}
+    </div>
+  );
+
+  if (finished) return (
+    <div className="p-4 text-center space-y-4">
+      <div className="text-5xl mb-2">{score === pool.length ? "🎉" : score >= pool.length * 0.7 ? "👏" : "💪"}</div>
+      <div className="font-bold text-2xl text-gray-800">{score}/{pool.length}</div>
+      <div className="text-gray-500">{score === pool.length ? "Perfect hearing!" : score >= pool.length * 0.7 ? "Great listening!" : "Keep practicing!"}</div>
+      <div className="flex gap-2">
+        <button onClick={() => setDifficulty(null)} className="flex-1 py-3 bg-gray-100 rounded-xl font-medium text-gray-700 hover:bg-gray-200">Change Difficulty</button>
+        <button onClick={() => startSession(difficulty)} className="flex-1 py-3 bg-sky-600 text-white rounded-xl font-medium hover:bg-sky-700">Try Again</button>
+      </div>
+    </div>
+  );
+
+  const item = pool[idx];
+  return (
+    <div className="p-4 space-y-4">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-medium text-gray-500">{idx + 1} / {pool.length}</span>
+        <span className="text-xs font-medium text-sky-600">{score} correct</span>
+      </div>
+      <div className="bg-white rounded-2xl p-6 shadow-sm text-center space-y-4">
+        <button onClick={() => playAudio(item.jp)} className="w-20 h-20 rounded-full bg-sky-100 text-sky-600 text-3xl flex items-center justify-center mx-auto hover:bg-sky-200 transition-colors active:scale-95">
+          🔊
+        </button>
+        <div className="text-sm text-gray-500">{difficulty === "speed" ? "Listen carefully — fast mode!" : "Tap to replay"}</div>
+        {submitted && (
+          <div className={`rounded-xl p-4 ${isCorrect ? "bg-green-50 border border-green-200" : "bg-red-50 border border-red-200"}`}>
+            <div className="font-bold text-lg">{item.jp}</div>
+            <div className="text-sm text-gray-600">{item.roma}</div>
+            <div className="text-sm text-gray-500 mt-1">{item.en}</div>
+            <div className={`text-sm font-semibold mt-2 ${isCorrect ? "text-green-600" : "text-red-600"}`}>
+              {isCorrect ? "Correct! ✓" : `Not quite — you typed "${input}"`}
+            </div>
+          </div>
+        )}
+      </div>
+      {!submitted ? (
+        <div className="flex gap-2">
+          <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && checkAnswer()}
+            placeholder="Type what you heard (romaji or かな)..." autoFocus
+            className="flex-1 px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-sky-400" />
+          <button onClick={checkAnswer} disabled={!input.trim()} className="px-5 py-3 bg-sky-600 text-white rounded-xl font-medium hover:bg-sky-700 disabled:opacity-40">Check</button>
+        </div>
+      ) : (
+        <button onClick={next} className="w-full py-3 bg-sky-600 text-white rounded-xl font-medium hover:bg-sky-700">
+          {idx + 1 >= pool.length ? "See Results" : "Next →"}
+        </button>
+      )}
     </div>
   );
 };
@@ -1640,6 +1800,186 @@ FORMAT RULES:
   );
 };
 
+// ── AI CONVERSATION SCENARIOS ────────────────────────────────────────────────
+const Conversations = ({ lessons, progress, username, recordConversationComplete }) => {
+  const [activeScenario, setActiveScenario] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [goalMet, setGoalMet] = useState(false);
+  const [voiceListening, setVoiceListening] = useState(false);
+  const [voiceTranscript, setVoiceTranscript] = useState("");
+  const bottomRef = useRef(null);
+  const voiceRecRef = useRef(null);
+  const voiceTimerRef = useRef(null);
+
+  const SpeechRecognition = typeof window !== "undefined" && (window.SpeechRecognition || window.webkitSpeechRecognition);
+
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+  useEffect(() => { return () => { if (voiceRecRef.current) { try { voiceRecRef.current.abort(); } catch {} } }; }, []);
+
+  const studiedLessons = Object.keys(lessons).filter((id) => {
+    const lp = progress.lessons?.[id];
+    return lp && ((lp.flash?.known?.length || 0) > 0 || lp.quiz?.bestScore != null || lp.listening?.bestScore != null);
+  }).map(Number);
+  const maxStudied = Math.max(0, ...studiedLessons);
+
+  const buildSystemPrompt = (scenario) => {
+    const allVocab = [], allGrammar = [];
+    Object.keys(lessons).forEach((id) => {
+      if (Number(id) <= Math.max(maxStudied, scenario.minLesson)) {
+        allVocab.push(...lessons[id].vocab);
+        allGrammar.push(...lessons[id].grammar);
+      }
+    });
+    return `You are playing the role of: ${scenario.character}
+Setting: ${scenario.setting}
+The student's name is ${username}.
+The student's goal: ${scenario.goal}
+
+RULES:
+1. Stay in character as ${scenario.character}. Be natural and friendly.
+2. Speak in Japanese with romaji in parentheses, then a brief English translation.
+   Example: すみません、なにを のみますか？(Sumimasen, nani wo nomimasu ka?) — Excuse me, what would you like to drink?
+3. The student is a beginner. They know this vocabulary and grammar:
+   Vocab: ${allVocab.map((v) => `${v.jp} (${v.roma}) = ${v.en}`).join(", ")}
+   Grammar: ${allGrammar.map((g) => `${g.jp} (${g.roma}) = ${g.en}`).join(", ")}
+4. Keep responses to 1-2 sentences in Japanese. Be concise.
+5. If the student makes a mistake, gently correct them while staying in character.
+6. Guide the conversation toward the goal naturally.
+7. When the student has successfully achieved the goal "${scenario.goal}", include [GOAL_COMPLETE] at the very end of your message.
+8. Don't rush to complete the goal — let it feel like a real conversation (at least 3-4 exchanges).
+9. Start by greeting the student in character.`;
+  };
+
+  const startScenario = async (scenario) => {
+    setActiveScenario(scenario);
+    setMessages([]);
+    setGoalMet(false);
+    setLoading(true);
+    try {
+      const system = buildSystemPrompt(scenario);
+      let text = await callAnthropic(system, [{ role: "user", content: "Start the conversation. Greet me in character." }]);
+      if (text.includes("[GOAL_COMPLETE]")) { text = text.replace("[GOAL_COMPLETE]", "").trim(); setGoalMet(true); }
+      setMessages([{ role: "assistant", text }]);
+    } catch { setMessages([{ role: "assistant", text: "すみません、接続エラーです。(Connection error.)" }]); }
+    setLoading(false);
+  };
+
+  const sendMsg = async (userMsg) => {
+    if (!userMsg || loading || goalMet) return;
+    setInput("");
+    const newMsgs = [...messages, { role: "user", text: userMsg }];
+    setMessages(newMsgs);
+    setLoading(true);
+    try {
+      const history = newMsgs.slice(-12).map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.text }));
+      const system = buildSystemPrompt(activeScenario);
+      let text = await callAnthropic(system, history);
+      if (text.includes("[GOAL_COMPLETE]")) {
+        text = text.replace("[GOAL_COMPLETE]", "").trim();
+        setGoalMet(true);
+        if (recordConversationComplete) recordConversationComplete(activeScenario.id);
+      }
+      setMessages((p) => [...p, { role: "assistant", text }]);
+      const jp = text.match(/[ぁ-んァ-ン一-龯]+[^\n]*/);
+      if (jp) speak(jp[0]);
+    } catch { setMessages((p) => [...p, { role: "assistant", text: "接続エラーです。(Connection error.)" }]); }
+    setLoading(false);
+  };
+
+  const startVoice = () => {
+    if (!SpeechRecognition) { alert("Speech recognition not supported. Try Chrome or Safari."); return; }
+    if (voiceListening) { stopVoice(); return; }
+    try {
+      const rec = new SpeechRecognition();
+      rec.lang = "ja-JP"; rec.interimResults = true; rec.continuous = false;
+      let finalText = "";
+      rec.onresult = (e) => { let t = ""; for (let i = 0; i < e.results.length; i++) t += e.results[i][0].transcript; setVoiceTranscript(t); finalText = t; clearTimeout(voiceTimerRef.current); voiceTimerRef.current = setTimeout(() => stopVoice(), 2000); };
+      rec.onerror = () => { clearTimeout(voiceTimerRef.current); setVoiceListening(false); };
+      rec.onend = () => { clearTimeout(voiceTimerRef.current); setVoiceListening(false); if (finalText.trim()) sendMsg(finalText.trim()); setVoiceTranscript(""); };
+      voiceTimerRef.current = setTimeout(() => stopVoice(), 6000);
+      rec.start(); voiceRecRef.current = rec; setVoiceListening(true); setVoiceTranscript("");
+    } catch { alert("Could not start speech recognition."); }
+  };
+
+  const stopVoice = () => { clearTimeout(voiceTimerRef.current); if (voiceRecRef.current) { try { voiceRecRef.current.stop(); } catch {} voiceRecRef.current = null; } setVoiceListening(false); };
+
+  if (!activeScenario) return (
+    <div className="p-4 space-y-3 overflow-y-auto">
+      <div className="text-center py-4">
+        <div className="text-4xl mb-2">💬</div>
+        <div className="font-bold text-lg text-gray-800">Conversation Practice</div>
+        <div className="text-sm text-gray-500 mt-1">Practice real-life situations with AI</div>
+      </div>
+      {CONVERSATION_SCENARIOS.map((s) => {
+        const locked = maxStudied < s.minLesson;
+        const completed = progress.conversations?.[s.id]?.completed;
+        return (
+          <button key={s.id} onClick={() => !locked && startScenario(s)} disabled={locked}
+            className={`w-full bg-white rounded-2xl p-4 flex items-center gap-3 shadow-sm border border-gray-100 transition-all ${locked ? "opacity-50" : "hover:shadow-md hover:border-green-200"}`}>
+            <div className="text-3xl">{s.emoji}</div>
+            <div className="flex-1 text-left">
+              <div className="font-semibold text-gray-800 flex items-center gap-2">
+                {s.title}
+                {completed && <span className="text-green-500 text-xs">✓</span>}
+              </div>
+              <div className="text-xs text-gray-500">{s.desc}</div>
+              {locked && <div className="text-xs text-orange-500 mt-0.5">Complete Lesson {s.minLesson} to unlock</div>}
+            </div>
+            <span className="text-gray-400">{locked ? "🔒" : "→"}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className={`px-4 py-2 text-center text-xs font-medium ${goalMet ? "bg-green-100 text-green-700" : "bg-green-50 text-green-600"}`}>
+        {goalMet ? `✓ Goal complete: ${activeScenario.goal}` : `Goal: ${activeScenario.goal}`}
+      </div>
+      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        {messages.map((m, i) => (
+          <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+            <div className={`max-w-xs rounded-2xl px-4 py-2 text-sm leading-relaxed ${
+              m.role === "user" ? "bg-green-600 text-white rounded-br-sm" : "bg-white border border-gray-200 text-gray-800 rounded-bl-sm"
+            }`}>
+              <span className="whitespace-pre-line">{m.text}</span>
+              {m.role === "assistant" && <button onClick={() => speak(m.text.match(/[ぁ-んァ-ン一-龯]+[^\n]*/)?.[0] || m.text)} className="ml-2 text-xs opacity-50 hover:opacity-100">🔊</button>}
+            </div>
+          </div>
+        ))}
+        {loading && <div className="flex justify-start"><div className="bg-white border border-gray-200 rounded-2xl px-4 py-2 text-sm text-gray-400 animate-pulse">考えています… ✏️</div></div>}
+        <div ref={bottomRef} />
+      </div>
+      {goalMet && (
+        <div className="px-4 py-3 bg-green-50 border-t border-green-100 text-center">
+          <div className="font-semibold text-green-700 mb-2">Great job! You completed the scenario! 🎉</div>
+          <button onClick={() => { setActiveScenario(null); setMessages([]); setGoalMet(false); }} className="px-6 py-2 bg-green-600 text-white rounded-xl text-sm font-medium hover:bg-green-700">Back to Scenarios</button>
+        </div>
+      )}
+      {voiceListening && (
+        <div className="px-4 py-2 bg-green-50 border-t border-green-100 text-center">
+          <div className="text-xs text-green-400 mb-1">Listening...</div>
+          <div className="text-sm text-green-600 font-medium">{voiceTranscript || "..."}</div>
+        </div>
+      )}
+      {!goalMet && (
+        <div className="p-3 border-t border-gray-100 bg-white flex gap-2 items-center flex-shrink-0">
+          <button onClick={startVoice}
+            className={`w-10 h-10 rounded-full flex items-center justify-center text-lg flex-shrink-0 transition-all ${voiceListening ? "bg-green-600 text-white animate-pulse" : "bg-green-50 text-green-600 hover:bg-green-100"}`}>
+            {voiceListening ? "🎙️" : "🎤"}
+          </button>
+          <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && sendMsg(input.trim())}
+            placeholder="Type in Japanese or tap mic..." className="flex-1 px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-green-400" />
+          <button onClick={() => sendMsg(input.trim())} disabled={loading || !input.trim()} className="px-4 py-2 bg-green-600 text-white rounded-xl text-sm font-medium hover:bg-green-700 disabled:opacity-40">送る</button>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ── JLPT N5 PRACTICE ──────────────────────────────────────────────────────────
 const BATCH_SIZE = 10;
 const JLPTPractice = ({ recordJlptScore }) => {
@@ -1995,6 +2335,7 @@ const LessonPicker = ({ mode, lessons, progress, onPickLesson, onBack }) => {
           else if (mode === "quiz") stat = quizBest != null ? `Best: ${quizBest}/${quizTotal}` : "Not attempted";
           else if (mode === "speak") stat = `${totalCards} phrases`;
           else if (mode === "stories") stat = `${storiesDone}/${scenarioCount} scenarios`;
+          else if (mode === "listen") { const lb = progress.lessons?.[id]?.listening; stat = lb?.bestScore != null ? `Best: ${lb.bestScore}/${lb.total}` : "Not attempted"; }
           else if (mode === "chat") stat = `${l.vocab.length} vocab, ${l.grammar.length} grammar`;
           return (
             <button key={id} onClick={() => onPickLesson(Number(id))}
@@ -2067,13 +2408,14 @@ function AppMain({ currentUser, onLogout }) {
   const lesson = selectedLesson ? lessons[selectedLesson] : null;
 
   const goHome = () => { setScreen("home"); setSelectedMode(null); setSelectedLesson(null); };
-  const pickMode = (mode) => { setSelectedMode(mode); setSelectedLesson(null); setScreen("pick-lesson"); };
+  const pickMode = (mode) => { setSelectedMode(mode); setSelectedLesson(null); setScreen(mode === "convo" ? "activity" : "pick-lesson"); };
   const pickLesson = (id) => { setSelectedLesson(id); setScreen("activity"); };
-  const handleBack = () => { if (screen === "activity") { setSelectedLesson(null); setScreen("pick-lesson"); } else goHome(); };
+  const handleBack = () => { if (screen === "activity" && selectedMode === "convo") goHome(); else if (screen === "activity") { setSelectedLesson(null); setScreen("pick-lesson"); } else goHome(); };
 
   const showBack = screen !== "home";
   const headerTitle = screen === "home" ? `${currentUser.username} の 日本語`
     : screen === "pick-lesson" ? MODE_META[selectedMode]?.name
+    : screen === "activity" && selectedMode === "convo" ? "Conversations"
     : screen === "activity" ? lesson?.title
     : screen === "greetings" ? "Greetings"
     : screen === "jlpt" ? "JLPT N5 Practice"
@@ -2104,7 +2446,7 @@ function AppMain({ currentUser, onLogout }) {
       </div>
 
       {/* Content */}
-      <div className={`flex-1 overflow-hidden ${screen === "activity" && (selectedMode === "chat" || selectedMode === "stories") ? "flex flex-col" : "overflow-y-auto"}`}>
+      <div className={`flex-1 overflow-hidden ${screen === "activity" && (selectedMode === "chat" || selectedMode === "stories" || selectedMode === "convo") ? "flex flex-col" : "overflow-y-auto"}`}>
         {screen === "home" && (
           <HomeScreen onPickMode={pickMode} onGo={(t) => setScreen(t)} progress={progressHook.progress} lessons={lessons} timeTracker={timeTracker} />
         )}
@@ -2123,8 +2465,14 @@ function AppMain({ currentUser, onLogout }) {
         {screen === "activity" && lesson && selectedMode === "stories" && (
           <Stories lessonId={selectedLesson} recordStoryComplete={progressHook.recordStoryComplete} getStoryStatus={progressHook.getStoryStatus} />
         )}
+        {screen === "activity" && lesson && selectedMode === "listen" && (
+          <Listening lesson={lesson} lessonId={selectedLesson} recordListeningScore={progressHook.recordListeningScore} />
+        )}
         {screen === "activity" && lesson && selectedMode === "chat" && (
           <ChatTutor lesson={lesson} lessonId={selectedLesson} username={currentUser.username} />
+        )}
+        {screen === "activity" && selectedMode === "convo" && (
+          <Conversations lessons={lessons} progress={progressHook.progress} username={currentUser.username} recordConversationComplete={progressHook.recordConversationComplete} />
         )}
         {screen === "greetings" && <GreetingsPanel />}
         {screen === "jlpt" && <JLPTPractice recordJlptScore={progressHook.recordJlptScore} />}
