@@ -2727,13 +2727,14 @@ const LessonDetail = ({ lessonId, lesson, progress, onPickMode }) => (
 );
 
 // ── SYNC HELPER ───────────────────────────────────────────────────────────────
+const LESSONS_VERSION = 2; // bump to invalidate cached lessons
 const useSyncLessons = () => {
   const [lessons, setLessons] = useState(() => {
     const cached = localStorage.getItem("synced_lessons");
     if (cached) {
       try {
-        const { data } = JSON.parse(cached);
-        return { ...DEFAULT_LESSONS, ...data };
+        const { data, version } = JSON.parse(cached);
+        if (version === LESSONS_VERSION) return { ...data, ...DEFAULT_LESSONS };
       } catch { /* fall through */ }
     }
     return DEFAULT_LESSONS;
@@ -2753,7 +2754,7 @@ const useSyncLessons = () => {
       .then((r) => r.json())
       .then((data) => {
         if (data.text) {
-          localStorage.setItem("synced_lessons", JSON.stringify({ data: DEFAULT_LESSONS, timestamp: Date.now(), raw: data.text }));
+          localStorage.setItem("synced_lessons", JSON.stringify({ data: DEFAULT_LESSONS, timestamp: Date.now(), raw: data.text, version: LESSONS_VERSION }));
           setSyncStatus("synced");
         } else {
           setSyncStatus("error");
