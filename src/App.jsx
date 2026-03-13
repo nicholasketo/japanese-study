@@ -1386,13 +1386,11 @@ const Flashcards = ({ lesson, lessonId, markFlashKnown, getFlashKnown }) => {
         {!flipped ? (
           <>
             <div className="text-3xl font-bold text-gray-800 mb-2">{card.front}</div>
-            <div className="text-xs text-gray-400">{card.roma}</div>
             <div className="mt-4 text-xs text-gray-400">tap to reveal</div>
           </>
         ) : (
           <>
             <div className="text-2xl font-semibold text-red-600 mb-1">{card.back}</div>
-            <div className="text-sm text-gray-500">{card.roma}</div>
             <button onClick={(e) => { e.stopPropagation(); speak(card.front); }} className="mt-3 px-3 py-1 bg-red-50 text-red-600 rounded-full text-xs font-medium hover:bg-red-100">
               🔊 Listen
             </button>
