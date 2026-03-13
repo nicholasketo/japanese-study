@@ -64,8 +64,12 @@ ${rawText}`;
     );
 
     const geminiData = await geminiResp.json();
+    if (geminiData.error) throw new Error(`Gemini API error: ${JSON.stringify(geminiData.error)}`);
     const geminiText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!geminiText) throw new Error("Empty Gemini response");
+    if (!geminiText) {
+      const reason = geminiData.candidates?.[0]?.finishReason || "unknown";
+      throw new Error(`Empty Gemini response (finishReason: ${reason}, raw: ${JSON.stringify(geminiData).slice(0, 500)})`);
+    }
 
     // Step 4: Parse and validate
     let parsed;
