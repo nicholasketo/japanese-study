@@ -2727,14 +2727,29 @@ const LessonDetail = ({ lessonId, lesson, progress, onPickMode }) => (
 );
 
 // ── SYNC HELPER ───────────────────────────────────────────────────────────────
-const LESSONS_VERSION = 3; // bump to invalidate cached lessons
+const LESSONS_VERSION = 4; // bump to invalidate cached lessons
+
+const mergeLessons = (parsed, defaults) => {
+  const result = { ...defaults };
+  for (const [id, lesson] of Object.entries(parsed)) {
+    if (lesson.title && Array.isArray(lesson.vocab) && Array.isArray(lesson.grammar)) {
+      result[id] = {
+        title: lesson.title,
+        vocab: lesson.vocab.length > 0 ? lesson.vocab : (defaults[id]?.vocab || []),
+        grammar: lesson.grammar.length > 0 ? lesson.grammar : (defaults[id]?.grammar || []),
+      };
+    }
+  }
+  return result;
+};
+
 const useSyncLessons = () => {
   const [lessons, setLessons] = useState(() => {
     const cached = localStorage.getItem("synced_lessons");
     if (cached) {
       try {
         const { data, version } = JSON.parse(cached);
-        if (version === LESSONS_VERSION) return { ...data, ...DEFAULT_LESSONS };
+        if (version === LESSONS_VERSION && data) return mergeLessons(data, DEFAULT_LESSONS);
       } catch { /* fall through */ }
     }
     return DEFAULT_LESSONS;
@@ -2745,22 +2760,34 @@ const useSyncLessons = () => {
     const cached = localStorage.getItem("synced_lessons");
     if (cached) {
       try {
-        const { timestamp } = JSON.parse(cached);
-        if (Date.now() - timestamp < 3600000) { setSyncStatus("synced"); return; }
+        const { timestamp, version } = JSON.parse(cached);
+        if (version === LESSONS_VERSION && Date.now() - timestamp < 3600000) { setSyncStatus("synced"); return; }
       } catch { /* fall through */ }
     }
     setSyncStatus("syncing");
-    fetch("/api/slides")
-      .then((r) => r.json())
+    fetch("/api/parse-slides")
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
       .then((data) => {
-        if (data.text) {
-          localStorage.setItem("synced_lessons", JSON.stringify({ data: DEFAULT_LESSONS, timestamp: Date.now(), raw: data.text, version: LESSONS_VERSION }));
+        if (data.lessons) {
+          const merged = mergeLessons(data.lessons, DEFAULT_LESSONS);
+          setLessons(merged);
+          localStorage.setItem("synced_lessons", JSON.stringify({
+            data: data.lessons,
+            timestamp: Date.now(),
+            version: LESSONS_VERSION,
+          }));
           setSyncStatus("synced");
         } else {
           setSyncStatus("error");
         }
       })
-      .catch(() => setSyncStatus("error"));
+      .catch((err) => {
+        console.warn("Lesson sync failed, using defaults:", err.message);
+        setSyncStatus("error");
+      });
   }, []);
 
   return { lessons, syncStatus };
