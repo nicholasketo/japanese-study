@@ -2270,6 +2270,56 @@ const ProgressDashboard = ({ progress, lessons, getLessonPercent, getJlptPercent
 };
 
 // ── HOME SCREEN ──────────────────────────────────────────────────────────────
+// ── ONBOARDING ───────────────────────────────────────────────────────────────
+const ONBOARDING_SLIDES = [
+  { emoji: "🇯🇵", title: "Welcome to Japanese Study!", desc: "Your all-in-one app for learning Japanese from scratch. Let's walk through what you can do here." },
+  { emoji: "🃏", title: "Flashcards & Quiz", desc: "Learn vocabulary and grammar with flashcards, then test yourself with quizzes. Each lesson builds on the last." },
+  { emoji: "👂", title: "Listening Practice", desc: "Hear Japanese words and phrases spoken aloud, then type what you heard. Great for training your ear." },
+  { emoji: "🎤", title: "Speaking Practice", desc: "Record yourself saying Japanese phrases and compare with the correct pronunciation. Build confidence speaking." },
+  { emoji: "🧑‍🏫", title: "Sensei — AI Tutor", desc: "Chat with your personal AI tutor. Ask questions, get drilled on vocab, or have it teach you how to say anything." },
+  { emoji: "💬", title: "Conversations", desc: "Practice real-life scenarios like ordering food or asking for directions. An AI character responds to you in Japanese." },
+  { emoji: "📖", title: "Stories & JLPT N5", desc: "Play through choose-your-own-adventure stories in Japanese, and test your skills with JLPT N5 practice questions." },
+  { emoji: "🚀", title: "You're all set!", desc: "Start with Lesson 1 flashcards to learn your first words, then explore the other modes as you go. がんばって！(Good luck!)" },
+];
+
+const Onboarding = ({ onComplete }) => {
+  const [slide, setSlide] = useState(0);
+  const s = ONBOARDING_SLIDES[slide];
+  const isLast = slide === ONBOARDING_SLIDES.length - 1;
+  return (
+    <div className="flex flex-col h-screen bg-gray-50 font-sans max-w-lg mx-auto">
+      <div className="bg-red-600 text-white px-4 py-3 text-center">
+        <div className="font-bold text-lg">日本語 Study</div>
+        <div className="text-xs text-red-200">Japanese Study App</div>
+      </div>
+      <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+        <div className="text-6xl mb-4">{s.emoji}</div>
+        <div className="font-bold text-xl text-gray-800 mb-2">{s.title}</div>
+        <div className="text-sm text-gray-500 leading-relaxed max-w-xs">{s.desc}</div>
+      </div>
+      <div className="p-4 space-y-3">
+        <div className="flex justify-center gap-1.5">
+          {ONBOARDING_SLIDES.map((_, i) => (
+            <div key={i} className={`w-2 h-2 rounded-full transition-all ${i === slide ? "bg-red-500 w-4" : "bg-gray-300"}`} />
+          ))}
+        </div>
+        <div className="flex gap-2">
+          {slide > 0 && (
+            <button onClick={() => setSlide((s) => s - 1)} className="px-6 py-3 bg-gray-100 rounded-xl font-medium text-gray-600 hover:bg-gray-200">Back</button>
+          )}
+          <button onClick={() => isLast ? onComplete() : setSlide((s) => s + 1)}
+            className="flex-1 py-3 bg-red-600 text-white rounded-xl font-medium hover:bg-red-700 transition-colors">
+            {isLast ? "Let's Go!" : "Next"}
+          </button>
+        </div>
+        {!isLast && (
+          <button onClick={onComplete} className="w-full text-center text-xs text-gray-400 hover:text-gray-600 py-1">Skip intro</button>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const HomeScreen = ({ onPickMode, onGo, progress, lessons, timeTracker }) => (
   <div className="flex-1 overflow-y-auto p-4 space-y-4">
     <div className="bg-white rounded-2xl shadow border border-gray-100 p-4 flex items-center gap-4">
@@ -2400,12 +2450,15 @@ function AppMain({ currentUser, onLogout }) {
   const [screen, setScreen] = useState("home");
   const [selectedMode, setSelectedMode] = useState(null);
   const [selectedLesson, setSelectedLesson] = useState(null);
+  const [showOnboarding, setShowOnboarding] = useState(() => !localStorage.getItem("onboarding_done"));
   const { lessons, syncStatus } = useSyncLessons();
   const progressHook = useProgress();
   const timeTracker = useTimeTracker();
   useSyncToServer(currentUser?.id);
 
   const lesson = selectedLesson ? lessons[selectedLesson] : null;
+
+  if (showOnboarding) return <Onboarding onComplete={() => { localStorage.setItem("onboarding_done", "1"); setShowOnboarding(false); }} />;
 
   const goHome = () => { setScreen("home"); setSelectedMode(null); setSelectedLesson(null); };
   const pickMode = (mode) => { setSelectedMode(mode); setSelectedLesson(null); setScreen(mode === "convo" ? "activity" : "pick-lesson"); };
