@@ -2077,7 +2077,8 @@ function AppMain({ currentUser, onLogout }) {
     : screen === "activity" ? lesson?.title
     : screen === "greetings" ? "Greetings"
     : screen === "jlpt" ? "JLPT N5 Practice"
-    : screen === "progress" ? "Progress" : "";
+    : screen === "progress" ? "Progress"
+    : screen === "settings" ? "Settings" : "";
 
   return (
     <div className="flex flex-col h-screen bg-gray-50 font-sans max-w-lg mx-auto">
@@ -2094,8 +2095,8 @@ function AppMain({ currentUser, onLogout }) {
         </div>
         <span title={syncStatus === "synced" ? "Content synced" : syncStatus === "syncing" ? "Syncing..." : "Using cached content"}
           className={`w-2 h-2 rounded-full flex-shrink-0 ${syncStatus === "synced" ? "bg-green-300" : syncStatus === "syncing" ? "bg-yellow-300 animate-pulse" : "bg-orange-300"}`} />
-        <button onClick={onLogout} className="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center hover:bg-red-400 text-[10px] font-bold flex-shrink-0" title="Switch profile">
-          {currentUser.username[0]?.toUpperCase()}
+        <button onClick={() => setScreen("settings")} className="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center hover:bg-red-400 text-[10px] font-bold flex-shrink-0" title="Settings">
+          {currentUser.avatarUrl ? <img src={currentUser.avatarUrl} className="w-8 h-8 rounded-full" alt="" /> : currentUser.username[0]?.toUpperCase()}
         </button>
         {showBack && (
           <button onClick={goHome} className="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center hover:bg-red-400 text-sm flex-shrink-0" title="Home">🏠</button>
@@ -2129,6 +2130,47 @@ function AppMain({ currentUser, onLogout }) {
         {screen === "jlpt" && <JLPTPractice recordJlptScore={progressHook.recordJlptScore} />}
         {screen === "progress" && (
           <ProgressDashboard progress={progressHook.progress} lessons={lessons} getLessonPercent={progressHook.getLessonPercent} getJlptPercent={progressHook.getJlptPercent} timeTracker={timeTracker} resetProgress={progressHook.resetProgress} />
+        )}
+        {screen === "settings" && (
+          <div className="p-4 space-y-4">
+            <div className="bg-white rounded-2xl p-5 shadow-sm text-center">
+              {currentUser.avatarUrl ? (
+                <img src={currentUser.avatarUrl} className="w-20 h-20 rounded-full mx-auto mb-3" alt="" />
+              ) : (
+                <div className="w-20 h-20 rounded-full bg-red-500 text-white text-3xl font-bold flex items-center justify-center mx-auto mb-3">
+                  {currentUser.username[0]?.toUpperCase()}
+                </div>
+              )}
+              <div className="font-bold text-lg text-gray-800">{currentUser.username}</div>
+              {currentUser.email && <div className="text-sm text-gray-500">{currentUser.email}</div>}
+              {currentUser.id === "local" && <div className="text-xs text-orange-500 mt-1">Guest mode — progress saved locally only</div>}
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+              <button onClick={() => setScreen("progress")} className="w-full px-5 py-4 flex items-center gap-3 hover:bg-gray-50 transition-colors border-b border-gray-100">
+                <span className="text-lg">📊</span>
+                <span className="text-gray-800 font-medium">Progress & Stats</span>
+                <span className="ml-auto text-gray-400 text-sm">→</span>
+              </button>
+              <button onClick={() => { progressHook.resetProgress(); goHome(); }} className="w-full px-5 py-4 flex items-center gap-3 hover:bg-gray-50 transition-colors">
+                <span className="text-lg">🔄</span>
+                <span className="text-gray-800 font-medium">Reset All Progress</span>
+                <span className="ml-auto text-gray-400 text-sm">→</span>
+              </button>
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+              <div className="px-5 py-4 border-b border-gray-100">
+                <div className="text-xs text-gray-400 uppercase tracking-wide font-semibold">About</div>
+              </div>
+              <div className="px-5 py-3 text-sm text-gray-500">Japanese Study App v1.0</div>
+              <div className="px-5 py-3 text-sm text-gray-500 border-t border-gray-100">Built with React + Supabase</div>
+            </div>
+
+            <button onClick={onLogout} className="w-full bg-white rounded-2xl p-4 text-red-500 font-semibold text-center shadow-sm hover:bg-red-50 transition-colors">
+              {currentUser.id === "local" ? "Back to Sign In" : "Sign Out"}
+            </button>
+          </div>
         )}
       </div>
     </div>
