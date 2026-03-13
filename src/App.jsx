@@ -1098,6 +1098,8 @@ const ProfileScreen = ({ onLogin }) => {
 
 // ── MODE CONSTANTS ────────────────────────────────────────────────────────────
 const MODE_TILES = [
+  { id: "learn", name: "Learn", icon: "📚", color: "from-indigo-500 to-purple-600", desc: "Study words & grammar first",
+    statFn: (p, l) => `${Object.keys(l).length} lessons available` },
   { id: "flash", name: "Flashcards", icon: "🃏", color: "from-rose-500 to-red-600", desc: "Learn vocab & grammar cards",
     statFn: (p, l) => { let k = 0, t = 0; Object.keys(l).forEach((id) => { t += l[id].vocab.length + l[id].grammar.length; k += p.lessons?.[id]?.flash?.known?.length || 0; }); return `${k}/${t} cards known`; } },
   { id: "quiz", name: "Quiz", icon: "❓", color: "from-amber-500 to-orange-600", desc: "Test your knowledge",
@@ -1115,6 +1117,7 @@ const MODE_TILES = [
 ];
 
 const MODE_META = {
+  learn: { name: "Learn", icon: "📚", color: "text-indigo-600", bg: "bg-indigo-50" },
   flash: { name: "Flashcards", icon: "🃏", color: "text-red-600", bg: "bg-red-50" },
   quiz: { name: "Quiz", icon: "❓", color: "text-orange-600", bg: "bg-orange-50" },
   speak: { name: "Speaking", icon: "🎤", color: "text-blue-600", bg: "bg-blue-50" },
@@ -1122,6 +1125,84 @@ const MODE_META = {
   listen: { name: "Listening", icon: "👂", color: "text-sky-600", bg: "bg-sky-50" },
   chat: { name: "Sensei", icon: "🧑‍🏫", color: "text-teal-600", bg: "bg-teal-50" },
   convo: { name: "Conversations", icon: "💬", color: "text-green-600", bg: "bg-green-50" },
+};
+
+// ── LEARN MODE (guided walkthrough) ──────────────────────────────────────────
+const LEARN_EMOJIS = ["🎌", "✨", "🌸", "💡", "📝", "🗾", "🎯", "🧠", "🌟", "📖", "🔤", "🎓", "💬", "🗣️"];
+const LearnMode = ({ lesson }) => {
+  const allItems = [
+    ...lesson.vocab.map((v) => ({ ...v, type: "vocab" })),
+    ...lesson.grammar.map((g) => ({ ...g, type: "grammar" })),
+  ];
+  const [idx, setIdx] = useState(0);
+  const [done, setDone] = useState(false);
+  const item = allItems[idx];
+  const progress = ((idx + 1) / allItems.length) * 100;
+  const isVocab = item?.type === "vocab";
+  const sectionLabel = isVocab ? "VOCABULARY" : "GRAMMAR PATTERN";
+
+  const gradients = [
+    "from-indigo-500 to-purple-600", "from-rose-500 to-pink-600", "from-cyan-500 to-blue-600",
+    "from-amber-500 to-orange-600", "from-emerald-500 to-teal-600", "from-violet-500 to-fuchsia-600",
+  ];
+  const gradient = gradients[idx % gradients.length];
+  const emoji = LEARN_EMOJIS[idx % LEARN_EMOJIS.length];
+
+  if (done) return (
+    <div className="p-4 text-center space-y-4 flex-1 flex flex-col items-center justify-center">
+      <div className="text-5xl mb-2">🎉</div>
+      <div className="font-bold text-xl text-gray-800">Lesson Complete!</div>
+      <div className="text-sm text-gray-500">You learned {lesson.vocab.length} words and {lesson.grammar.length} grammar patterns.</div>
+      <div className="text-sm text-gray-400 mt-2">Now try Flashcards or Quiz to test yourself!</div>
+    </div>
+  );
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Progress bar */}
+      <div className="px-4 pt-3">
+        <div className="flex items-center justify-between text-xs text-gray-400 mb-1">
+          <span>{sectionLabel}</span>
+          <span>{idx + 1} / {allItems.length}</span>
+        </div>
+        <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
+          <div className="h-full bg-indigo-500 rounded-full transition-all duration-300" style={{ width: `${progress}%` }} />
+        </div>
+      </div>
+
+      {/* Visual card */}
+      <div className="flex-1 flex items-center justify-center p-4">
+        <div className={`w-full bg-gradient-to-br ${gradient} rounded-3xl p-6 text-white shadow-xl relative overflow-hidden`}>
+          <div className="absolute top-4 right-4 text-4xl opacity-30">{emoji}</div>
+          <div className="text-xs uppercase tracking-wider opacity-70 mb-4">{isVocab ? "Word" : "Pattern"}</div>
+          <div className="text-4xl font-bold mb-3 leading-tight">{item.jp}</div>
+          <div className="text-lg opacity-90 mb-1">{item.roma}</div>
+          <div className="h-px bg-white/30 my-4" />
+          <div className="text-xl font-semibold">{item.en}</div>
+          {!isVocab && (
+            <div className="mt-3 bg-white/15 rounded-xl p-3 text-sm opacity-90">
+              <div className="text-xs uppercase tracking-wide opacity-70 mb-1">Example</div>
+              <div>{item.jp.replace(/\{[^}]+\}/g, "___")}</div>
+            </div>
+          )}
+          <button onClick={() => speak(item.jp)} className="mt-4 flex items-center gap-2 bg-white/20 hover:bg-white/30 rounded-xl px-4 py-2 text-sm transition-colors">
+            <span>🔊</span> Listen
+          </button>
+        </div>
+      </div>
+
+      {/* Navigation */}
+      <div className="p-4 flex gap-2">
+        {idx > 0 && (
+          <button onClick={() => setIdx((i) => i - 1)} className="px-6 py-3 bg-gray-100 rounded-xl font-medium text-gray-600 hover:bg-gray-200">← Back</button>
+        )}
+        <button onClick={() => idx + 1 >= allItems.length ? setDone(true) : setIdx((i) => i + 1)}
+          className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition-colors">
+          {idx + 1 >= allItems.length ? "Finish! 🎉" : "Next →"}
+        </button>
+      </div>
+    </div>
+  );
 };
 
 // ── FLASHCARDS ────────────────────────────────────────────────────────────────
@@ -1803,6 +1884,7 @@ FORMAT RULES:
 // ── AI CONVERSATION SCENARIOS ────────────────────────────────────────────────
 const Conversations = ({ lessons, progress, username, recordConversationComplete }) => {
   const [activeScenario, setActiveScenario] = useState(null);
+  const [showSceneCard, setShowSceneCard] = useState(false);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -1905,6 +1987,31 @@ RULES:
 
   const stopVoice = () => { clearTimeout(voiceTimerRef.current); if (voiceRecRef.current) { try { voiceRecRef.current.stop(); } catch {} voiceRecRef.current = null; } setVoiceListening(false); };
 
+  // Scene card before starting conversation
+  if (showSceneCard && activeScenario) return (
+    <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+      <div className="bg-white rounded-3xl shadow-xl border border-gray-100 p-8 max-w-sm w-full">
+        <div className="text-6xl mb-4">{activeScenario.emoji}</div>
+        <div className="font-bold text-xl text-gray-800 mb-2">{activeScenario.title}</div>
+        <div className="text-sm text-gray-500 mb-4">{activeScenario.desc}</div>
+        <div className="bg-gray-50 rounded-xl p-4 mb-4 text-left space-y-2">
+          <div className="text-xs text-gray-400 uppercase font-semibold">Setting</div>
+          <div className="text-sm text-gray-700 leading-relaxed">{activeScenario.setting}</div>
+          <div className="text-xs text-gray-400 uppercase font-semibold mt-3">Your Goal</div>
+          <div className="text-sm text-green-700 font-medium">{activeScenario.goal}</div>
+          <div className="text-xs text-gray-400 uppercase font-semibold mt-3">You'll meet</div>
+          <div className="text-sm text-gray-700">{activeScenario.character}</div>
+        </div>
+        <button onClick={() => { setShowSceneCard(false); startScenario(activeScenario); }}
+          className="w-full py-3 bg-green-600 text-white rounded-xl font-semibold hover:bg-green-700 transition-colors text-sm">
+          Start Conversation
+        </button>
+        <button onClick={() => { setActiveScenario(null); setShowSceneCard(false); }}
+          className="w-full mt-2 py-2 text-gray-400 text-xs hover:text-gray-600">Back to scenarios</button>
+      </div>
+    </div>
+  );
+
   if (!activeScenario) return (
     <div className="p-4 space-y-3 overflow-y-auto">
       <div className="text-center py-4">
@@ -1916,7 +2023,7 @@ RULES:
         const locked = maxStudied < s.minLesson;
         const completed = progress.conversations?.[s.id]?.completed;
         return (
-          <button key={s.id} onClick={() => !locked && startScenario(s)} disabled={locked}
+          <button key={s.id} onClick={() => { if (!locked) { setActiveScenario(s); setShowSceneCard(true); } }} disabled={locked}
             className={`w-full bg-white rounded-2xl p-4 flex items-center gap-3 shadow-sm border border-gray-100 transition-all ${locked ? "opacity-50" : "hover:shadow-md hover:border-green-200"}`}>
             <div className="text-3xl">{s.emoji}</div>
             <div className="flex-1 text-left">
@@ -2272,14 +2379,11 @@ const ProgressDashboard = ({ progress, lessons, getLessonPercent, getJlptPercent
 // ── HOME SCREEN ──────────────────────────────────────────────────────────────
 // ── ONBOARDING ───────────────────────────────────────────────────────────────
 const ONBOARDING_SLIDES = [
-  { emoji: "🇯🇵", title: "Welcome to Japanese Study!", desc: "Your all-in-one app for learning Japanese from scratch. Let's walk through what you can do here." },
-  { emoji: "🃏", title: "Flashcards & Quiz", desc: "Learn vocabulary and grammar with flashcards, then test yourself with quizzes. Each lesson builds on the last." },
-  { emoji: "👂", title: "Listening Practice", desc: "Hear Japanese words and phrases spoken aloud, then type what you heard. Great for training your ear." },
-  { emoji: "🎤", title: "Speaking Practice", desc: "Record yourself saying Japanese phrases and compare with the correct pronunciation. Build confidence speaking." },
-  { emoji: "🧑‍🏫", title: "Sensei — AI Tutor", desc: "Chat with your personal AI tutor. Ask questions, get drilled on vocab, or have it teach you how to say anything." },
-  { emoji: "💬", title: "Conversations", desc: "Practice real-life scenarios like ordering food or asking for directions. An AI character responds to you in Japanese." },
-  { emoji: "📖", title: "Stories & JLPT N5", desc: "Play through choose-your-own-adventure stories in Japanese, and test your skills with JLPT N5 practice questions." },
-  { emoji: "🚀", title: "You're all set!", desc: "Start with Lesson 1 flashcards to learn your first words, then explore the other modes as you go. がんばって！(Good luck!)" },
+  { emoji: "🇯🇵", title: "Welcome to Japanese Study!", desc: "Your all-in-one app for learning Japanese from scratch. Let's walk through how it works." },
+  { emoji: "📚", title: "Pick a Lesson, Then Learn", desc: "Start by choosing a lesson. Inside each lesson, you'll find Learn mode — a guided walkthrough of all the vocab and grammar before you practice." },
+  { emoji: "🃏", title: "Practice Your Way", desc: "After learning, practice with Flashcards, Quiz, Listening, Speaking, Stories, or chat with your AI Sensei — all within the same lesson." },
+  { emoji: "💬", title: "Conversations", desc: "Once you've studied, test yourself in real-life AI roleplay scenarios like ordering food or asking for directions." },
+  { emoji: "🚀", title: "You're all set!", desc: "Tap Lesson 1 to start learning your first Japanese words and grammar. がんばって！(Good luck!)" },
 ];
 
 const Onboarding = ({ onComplete }) => {
@@ -2320,91 +2424,155 @@ const Onboarding = ({ onComplete }) => {
   );
 };
 
-const HomeScreen = ({ onPickMode, onGo, progress, lessons, timeTracker }) => (
-  <div className="flex-1 overflow-y-auto p-4 space-y-4">
-    <div className="bg-white rounded-2xl shadow border border-gray-100 p-4 flex items-center gap-4">
-      <div className="text-3xl">🇯🇵</div>
-      <div className="flex-1">
-        <div className="font-bold text-gray-800 text-lg">Welcome back!</div>
-        <div className="text-xs text-gray-500">
-          Today: {timeTracker.todayMinutes}m studied
-          {timeTracker.streak >= 1 ? ` | ${timeTracker.streak}-day streak` : ""}
-          {timeTracker.streak >= 3 ? " 🔥" : ""}
+// ── LESSON MODES (features within each lesson) ──────────────────────────────
+const LESSON_MODES = [
+  { id: "learn", name: "Learn", icon: "📚", color: "from-indigo-500 to-purple-600", desc: "Study words & grammar first",
+    statFn: (p, l, id) => `${l.vocab.length} vocab, ${l.grammar.length} grammar` },
+  { id: "flash", name: "Flashcards", icon: "🃏", color: "from-rose-500 to-red-600", desc: "Practice with cards",
+    statFn: (p, l, id) => { const k = p.lessons?.[id]?.flash?.known?.length || 0; return `${k}/${l.vocab.length + l.grammar.length} known`; } },
+  { id: "quiz", name: "Quiz", icon: "❓", color: "from-amber-500 to-orange-600", desc: "Test your knowledge",
+    statFn: (p, l, id) => { const q = p.lessons?.[id]?.quiz; return q?.bestScore != null ? `Best: ${q.bestScore}/${q.total}` : "Not attempted"; } },
+  { id: "speak", name: "Speaking", icon: "🎤", color: "from-blue-500 to-indigo-600", desc: "Practice pronunciation",
+    statFn: (p, l, id) => `${l.vocab.length + l.grammar.length} phrases` },
+  { id: "listen", name: "Listening", icon: "👂", color: "from-cyan-500 to-sky-600", desc: "Hear & type what you hear",
+    statFn: (p, l, id) => { const lb = p.lessons?.[id]?.listening; return lb?.bestScore != null ? `Best: ${lb.bestScore}/${lb.total}` : "Not attempted"; } },
+  { id: "stories", name: "Stories", icon: "📖", color: "from-purple-500 to-violet-600", desc: "Choose-your-own-adventure",
+    statFn: (p, l, id) => { const c = p.lessons?.[id]?.stories?.completed?.length || 0; const t = (SCENARIOS[id] || []).length; return `${c}/${t} scenarios`; } },
+  { id: "chat", name: "Sensei", icon: "🧑‍🏫", color: "from-emerald-500 to-teal-600", desc: "Your personal AI tutor",
+    statFn: () => "Powered by Gemini" },
+];
+
+const HomeScreen = ({ onPickLesson, onConversations, onGo, progress, lessons, timeTracker }) => {
+  const lessonIds = Object.keys(lessons);
+  return (
+    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="bg-white rounded-2xl shadow border border-gray-100 p-4 flex items-center gap-4">
+        <div className="text-3xl">🇯🇵</div>
+        <div className="flex-1">
+          <div className="font-bold text-gray-800 text-lg">Welcome back!</div>
+          <div className="text-xs text-gray-500">
+            Today: {timeTracker.todayMinutes}m studied
+            {timeTracker.streak >= 1 ? ` | ${timeTracker.streak}-day streak` : ""}
+            {timeTracker.streak >= 3 ? " 🔥" : ""}
+          </div>
         </div>
       </div>
-    </div>
 
-    <div className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Learning Modes</div>
-    <div className="grid grid-cols-2 gap-3">
-      {MODE_TILES.map((mode, i) => (
-        <button key={mode.id} onClick={() => onPickMode(mode.id)}
-          className={`bg-gradient-to-br ${mode.color} text-white rounded-2xl p-4 text-left shadow-lg hover:scale-[1.02] active:scale-95 transition-all ${i === MODE_TILES.length - 1 && MODE_TILES.length % 2 !== 0 ? "col-span-2" : ""}`}>
-          <div className="text-3xl mb-2">{mode.icon}</div>
-          <div className="font-bold text-sm">{mode.name}</div>
-          <div className="text-[11px] opacity-80 mt-0.5">{mode.desc}</div>
-          <div className="text-[10px] opacity-70 mt-2 font-medium">{mode.statFn(progress, lessons)}</div>
-        </button>
-      ))}
-    </div>
-
-    <div className="text-xs text-gray-400 font-semibold uppercase tracking-wide mt-2">Quick Access</div>
-    <div className="grid grid-cols-3 gap-2">
-      <button onClick={() => onGo("greetings")} className="bg-white rounded-xl border border-gray-100 p-3 text-center hover:border-red-300 hover:bg-red-50 transition-all shadow-sm">
-        <div className="text-2xl mb-1">👋</div>
-        <div className="text-xs font-medium text-gray-700">Greetings</div>
-      </button>
-      <button onClick={() => onGo("jlpt")} className="bg-white rounded-xl border border-gray-100 p-3 text-center hover:border-indigo-300 hover:bg-indigo-50 transition-all shadow-sm">
-        <div className="text-2xl mb-1">📝</div>
-        <div className="text-xs font-medium text-gray-700">JLPT N5</div>
-      </button>
-      <button onClick={() => onGo("progress")} className="bg-white rounded-xl border border-gray-100 p-3 text-center hover:border-green-300 hover:bg-green-50 transition-all shadow-sm">
-        <div className="text-2xl mb-1">📊</div>
-        <div className="text-xs font-medium text-gray-700">Progress</div>
-      </button>
-    </div>
-  </div>
-);
-
-// ── LESSON PICKER ────────────────────────────────────────────────────────────
-const LessonPicker = ({ mode, lessons, progress, onPickLesson, onBack }) => {
-  const meta = MODE_META[mode];
-  return (
-    <div className="flex-1 overflow-y-auto">
-      <div className="p-4 space-y-3">
-        <div className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Choose a Lesson</div>
-        {Object.keys(lessons).map((id) => {
+      <div className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Your Lessons</div>
+      <div className="space-y-3">
+        {lessonIds.map((id) => {
           const l = lessons[id];
           const totalCards = l.vocab.length + l.grammar.length;
           const knownCount = progress.lessons?.[id]?.flash?.known?.length || 0;
           const quizBest = progress.lessons?.[id]?.quiz?.bestScore;
-          const quizTotal = progress.lessons?.[id]?.quiz?.total;
           const storiesDone = progress.lessons?.[id]?.stories?.completed?.length || 0;
           const scenarioCount = (SCENARIOS[id] || []).length;
-          let stat = "";
-          if (mode === "flash") stat = `${knownCount}/${totalCards} cards known`;
-          else if (mode === "quiz") stat = quizBest != null ? `Best: ${quizBest}/${quizTotal}` : "Not attempted";
-          else if (mode === "speak") stat = `${totalCards} phrases`;
-          else if (mode === "stories") stat = `${storiesDone}/${scenarioCount} scenarios`;
-          else if (mode === "listen") { const lb = progress.lessons?.[id]?.listening; stat = lb?.bestScore != null ? `Best: ${lb.bestScore}/${lb.total}` : "Not attempted"; }
-          else if (mode === "chat") stat = `${l.vocab.length} vocab, ${l.grammar.length} grammar`;
+          const pct = totalCards > 0 ? Math.round((knownCount / totalCards) * 100) : 0;
           return (
             <button key={id} onClick={() => onPickLesson(Number(id))}
-              className="w-full text-left bg-white rounded-xl border border-gray-100 p-4 hover:border-red-300 hover:shadow transition-all">
+              className="w-full text-left bg-white rounded-2xl border border-gray-100 p-4 hover:border-red-300 hover:shadow-md transition-all">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold text-sm flex-shrink-0">L{id}</div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium text-gray-800 text-sm truncate">{l.title}</div>
-                  <div className="text-xs text-gray-500 mt-0.5">{stat}</div>
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center text-white font-bold text-lg flex-shrink-0 shadow">
+                  {id}
                 </div>
-                <span className="text-gray-300 text-lg">›</span>
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold text-gray-800 text-sm truncate">{l.title}</div>
+                  <div className="text-[11px] text-gray-400 mt-0.5">
+                    {l.vocab.length} vocab · {l.grammar.length} grammar
+                    {quizBest != null ? ` · Quiz: ${quizBest}` : ""}
+                    {storiesDone > 0 ? ` · ${storiesDone}/${scenarioCount} stories` : ""}
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-1.5 mt-2">
+                    <div className="bg-red-500 h-1.5 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+                <span className="text-gray-300 text-xl">›</span>
               </div>
             </button>
           );
         })}
       </div>
+
+      <div className="text-xs text-gray-400 font-semibold uppercase tracking-wide mt-2">Practice & Testing</div>
+      <button onClick={onConversations}
+        className="w-full bg-gradient-to-br from-green-500 to-emerald-600 text-white rounded-2xl p-4 text-left shadow-lg hover:scale-[1.02] active:scale-95 transition-all">
+        <div className="flex items-center gap-3">
+          <div className="text-3xl">💬</div>
+          <div className="flex-1">
+            <div className="font-bold">Conversations</div>
+            <div className="text-[11px] opacity-80">Real-life AI roleplay scenarios</div>
+            <div className="text-[10px] opacity-70 mt-1 font-medium">
+              {Object.keys(progress.conversations || {}).filter((id) => progress.conversations[id]?.completed).length}/{CONVERSATION_SCENARIOS.length} completed
+            </div>
+          </div>
+          <span className="text-white/60 text-xl">›</span>
+        </div>
+      </button>
+
+      <div className="text-xs text-gray-400 font-semibold uppercase tracking-wide mt-2">Quick Access</div>
+      <div className="grid grid-cols-3 gap-2">
+        <button onClick={() => onGo("greetings")} className="bg-white rounded-xl border border-gray-100 p-3 text-center hover:border-red-300 hover:bg-red-50 transition-all shadow-sm">
+          <div className="text-2xl mb-1">👋</div>
+          <div className="text-xs font-medium text-gray-700">Greetings</div>
+        </button>
+        <button onClick={() => onGo("jlpt")} className="bg-white rounded-xl border border-gray-100 p-3 text-center hover:border-indigo-300 hover:bg-indigo-50 transition-all shadow-sm">
+          <div className="text-2xl mb-1">📝</div>
+          <div className="text-xs font-medium text-gray-700">JLPT N5</div>
+        </button>
+        <button onClick={() => onGo("progress")} className="bg-white rounded-xl border border-gray-100 p-3 text-center hover:border-green-300 hover:bg-green-50 transition-all shadow-sm">
+          <div className="text-2xl mb-1">📊</div>
+          <div className="text-xs font-medium text-gray-700">Progress</div>
+        </button>
+      </div>
     </div>
   );
 };
+
+// ── LESSON DETAIL (all modes for one lesson) ─────────────────────────────────
+const LessonDetail = ({ lessonId, lesson, progress, onPickMode }) => (
+  <div className="flex-1 overflow-y-auto p-4 space-y-4">
+    <div className="bg-white rounded-2xl shadow border border-gray-100 p-4">
+      <div className="flex items-center gap-3">
+        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center text-white font-bold text-lg shadow">
+          {lessonId}
+        </div>
+        <div>
+          <div className="font-bold text-gray-800">{lesson.title}</div>
+          <div className="text-xs text-gray-400">{lesson.vocab.length} vocabulary · {lesson.grammar.length} grammar patterns</div>
+        </div>
+      </div>
+    </div>
+
+    <div className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Start Learning</div>
+    {LESSON_MODES.slice(0, 1).map((mode) => (
+      <button key={mode.id} onClick={() => onPickMode(mode.id)}
+        className={`w-full bg-gradient-to-br ${mode.color} text-white rounded-2xl p-5 text-left shadow-lg hover:scale-[1.02] active:scale-95 transition-all`}>
+        <div className="flex items-center gap-4">
+          <div className="text-4xl">{mode.icon}</div>
+          <div className="flex-1">
+            <div className="font-bold text-lg">{mode.name}</div>
+            <div className="text-sm opacity-80">{mode.desc}</div>
+            <div className="text-xs opacity-70 mt-1 font-medium">{mode.statFn(progress, lesson, lessonId)}</div>
+          </div>
+          <span className="text-white/60 text-xl">›</span>
+        </div>
+      </button>
+    ))}
+
+    <div className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Practice & Review</div>
+    <div className="grid grid-cols-2 gap-3">
+      {LESSON_MODES.slice(1).map((mode) => (
+        <button key={mode.id} onClick={() => onPickMode(mode.id)}
+          className={`bg-gradient-to-br ${mode.color} text-white rounded-2xl p-4 text-left shadow-lg hover:scale-[1.02] active:scale-95 transition-all`}>
+          <div className="text-3xl mb-2">{mode.icon}</div>
+          <div className="font-bold text-sm">{mode.name}</div>
+          <div className="text-[11px] opacity-80 mt-0.5">{mode.desc}</div>
+          <div className="text-[10px] opacity-70 mt-2 font-medium">{mode.statFn(progress, lesson, lessonId)}</div>
+        </button>
+      ))}
+    </div>
+  </div>
+);
 
 // ── SYNC HELPER ───────────────────────────────────────────────────────────────
 const useSyncLessons = () => {
@@ -2461,15 +2629,21 @@ function AppMain({ currentUser, onLogout }) {
   if (showOnboarding) return <Onboarding onComplete={() => { localStorage.setItem("onboarding_done", "1"); setShowOnboarding(false); }} />;
 
   const goHome = () => { setScreen("home"); setSelectedMode(null); setSelectedLesson(null); };
-  const pickMode = (mode) => { setSelectedMode(mode); setSelectedLesson(null); setScreen(mode === "convo" ? "activity" : "pick-lesson"); };
-  const pickLesson = (id) => { setSelectedLesson(id); setScreen("activity"); };
-  const handleBack = () => { if (screen === "activity" && selectedMode === "convo") goHome(); else if (screen === "activity") { setSelectedLesson(null); setScreen("pick-lesson"); } else goHome(); };
+  const pickLesson = (id) => { setSelectedLesson(id); setSelectedMode(null); setScreen("lesson-detail"); };
+  const pickMode = (mode) => { setSelectedMode(mode); setScreen("activity"); };
+  const openConversations = () => { setSelectedMode("convo"); setSelectedLesson(null); setScreen("activity"); };
+  const handleBack = () => {
+    if (screen === "activity" && selectedMode === "convo") goHome();
+    else if (screen === "activity") { setSelectedMode(null); setScreen("lesson-detail"); }
+    else if (screen === "lesson-detail") goHome();
+    else goHome();
+  };
 
   const showBack = screen !== "home";
   const headerTitle = screen === "home" ? `${currentUser.username} の 日本語`
-    : screen === "pick-lesson" ? MODE_META[selectedMode]?.name
+    : screen === "lesson-detail" ? lesson?.title
     : screen === "activity" && selectedMode === "convo" ? "Conversations"
-    : screen === "activity" ? lesson?.title
+    : screen === "activity" ? `${lesson?.title} — ${MODE_META[selectedMode]?.name || ""}`
     : screen === "greetings" ? "Greetings"
     : screen === "jlpt" ? "JLPT N5 Practice"
     : screen === "progress" ? "Progress"
@@ -2501,10 +2675,13 @@ function AppMain({ currentUser, onLogout }) {
       {/* Content */}
       <div className={`flex-1 overflow-hidden ${screen === "activity" && (selectedMode === "chat" || selectedMode === "stories" || selectedMode === "convo") ? "flex flex-col" : "overflow-y-auto"}`}>
         {screen === "home" && (
-          <HomeScreen onPickMode={pickMode} onGo={(t) => setScreen(t)} progress={progressHook.progress} lessons={lessons} timeTracker={timeTracker} />
+          <HomeScreen onPickLesson={pickLesson} onConversations={openConversations} onGo={(t) => setScreen(t)} progress={progressHook.progress} lessons={lessons} timeTracker={timeTracker} />
         )}
-        {screen === "pick-lesson" && (
-          <LessonPicker mode={selectedMode} lessons={lessons} progress={progressHook.progress} onPickLesson={pickLesson} onBack={goHome} />
+        {screen === "lesson-detail" && lesson && (
+          <LessonDetail lessonId={selectedLesson} lesson={lesson} progress={progressHook.progress} onPickMode={pickMode} />
+        )}
+        {screen === "activity" && lesson && selectedMode === "learn" && (
+          <LearnMode lesson={lesson} />
         )}
         {screen === "activity" && lesson && selectedMode === "flash" && (
           <Flashcards lesson={lesson} lessonId={selectedLesson} markFlashKnown={progressHook.markFlashKnown} getFlashKnown={progressHook.getFlashKnown} />
